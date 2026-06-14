@@ -24,42 +24,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class CurrencyParser {
-    public static void main(String[] args) {
 
-        String url = "https://www.cbr.ru/scripts/XML_daily.asp"; //путь к xml центробанка
-        Document doc = parseUrl(url);
-
-        if (doc == null) {
-            System.out.println("XML-документ не был получен. Программа завершена.");
-            return;
-        }
-
-        Scanner in = new Scanner(System.in);
-
-        ArrayList<Element> selectedCurrencies = getCurrency(doc);
-
-        if (selectedCurrencies.isEmpty()) {
-            System.out.println("Валюты не выбраны. Программа завершена.");
-            return;
-        }
-
-        System.out.println();
-        System.out.println("Сохранить выбранные валюты в XML? y/n");
-        String xmlResponse = in.nextLine();
-
-        if (xmlResponse.equalsIgnoreCase("y")) {
-            createXml(selectedCurrencies);
-        }
-
-        System.out.println();
-        System.out.println("Сохранить выбранные валюты в Excel? y/n");
-        String excelResponse = in.nextLine();
-
-        if (excelResponse.equalsIgnoreCase("y")) {
-            createExcel(selectedCurrencies);
-        }
-
-    }
 
     public static Document parseUrl(String url) {  //Метод для пасринга урл центробанка и запись результатов в document
         try{
@@ -82,7 +47,7 @@ public class CurrencyParser {
     }
 
 
-
+//метод для создания XML файла на основе выбранных валют
     public static void createXml(ArrayList<Element> selectedCurrencies) {
 
         try {
@@ -122,92 +87,29 @@ public class CurrencyParser {
 
     }
 
-
-    public static ArrayList<Element> getCurrency(Document document){
-        ArrayList<Element> selectedCurrencies = new ArrayList<>();
+    //метод для получения списка всех валют
+    public static ArrayList<Element> getAllCurrencies(Document document) {
+        ArrayList<Element> currencies = new ArrayList<>();
 
         NodeList valuteList = document.getElementsByTagName("Valute");
 
-        System.out.println("Список доступных валют:");
-        System.out.println("------------------------------");
-
         for (int i = 0; i < valuteList.getLength(); i++) {
             Node node = valuteList.item(i);
-
             Element valute = (Element) node;
 
-            String charCode = valute.getElementsByTagName("CharCode").item(0).getTextContent();
-            String name = valute.getElementsByTagName("Name").item(0).getTextContent();
-
-            System.out.println(charCode + " - " + name);
+            currencies.add(valute);
         }
 
-        System.out.println("------------------------------");
-        System.out.println();
-
-        Scanner in = new Scanner(System.in);
-
-        System.out.print("Введите коды валют через пробел или ALL для выбора всех валют: ");
-        String userInput = in.nextLine().trim().toUpperCase();
-
-        if (userInput.equals("ALL")) {
-
-            for (int i = 0; i < valuteList.getLength(); i++) {
-                Node node = valuteList.item(i);
-                Element valute = (Element) node;
-                selectedCurrencies.add(valute);
-            }
-
-            System.out.println("Выбраны все валюты.");
-
-        }
-        else {
-            String[] userCodes = userInput.split("\\s+");
-
-            for (int i = 0; i < userCodes.length; i++) {
-
-                String userCode = userCodes[i];
-                boolean isFound = false;
-
-                for (int j = 0; j < valuteList.getLength(); j++) {
-                    Node node = valuteList.item(j);
-
-                    Element valute = (Element) node;
-
-                    String charCode = valute.getElementsByTagName("CharCode").item(0).getTextContent();
-
-                    if (charCode.equalsIgnoreCase(userCode)) {
-                        selectedCurrencies.add(valute);
-
-                        String numCode = valute.getElementsByTagName("NumCode").item(0).getTextContent();
-                        String nominal = valute.getElementsByTagName("Nominal").item(0).getTextContent();
-                        String name = valute.getElementsByTagName("Name").item(0).getTextContent();
-                        String value = valute.getElementsByTagName("Value").item(0).getTextContent();
-
-                        System.out.println();
-                        System.out.println("Валюта выбрана:");
-                        System.out.println("------------------------------");
-                        System.out.println("Цифровой код: " + numCode);
-                        System.out.println("Буквенный код: " + charCode);
-                        System.out.println("Название: " + name);
-                        System.out.println("Номинал: " + nominal);
-                        System.out.println("Курс: " + value);
-                        System.out.println("------------------------------");
-
-                        isFound = true;
-                        break;
-                    }
-                }
-
-                if (!isFound) {
-                    System.out.println("Валюта с кодом " + userCode + " не найдена.");
-                }
-            }
-        }
-        return selectedCurrencies;
-
+        return currencies;
     }
 
+    //вспомогательный метод чтобы не писать всегда valute.getElementsByTagName("CharCode").item(0).getTextContent()
+    public static String getTagValue(Element element, String tagName) {
+        return element.getElementsByTagName(tagName).item(0).getTextContent();
+    }
+
+
+    //метод для создания эксель файла на основе выбранных валют
     public static void createExcel(ArrayList<Element> selectedCurrencies){
         try {
             String excelFileName = "rates.xlsx";
