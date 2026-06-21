@@ -33,3 +33,4 @@ target/
 *.class
 currencies.xml
 rates.xlsx
+last_rates.txt

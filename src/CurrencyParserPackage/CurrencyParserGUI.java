@@ -14,7 +14,7 @@ public class CurrencyParserGUI {
         ArrayList<Element> allCurrencies = CurrencyParser.getAllCurrencies(document);
 
         JFrame frame = new JFrame("Парсер курсов валют ЦБ РФ");
-        frame.setSize(900, 550);
+        frame.setSize(1100, 550);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLocationRelativeTo(null);
 
@@ -45,6 +45,7 @@ public class CurrencyParserGUI {
         JButton clearButton = new JButton("Очистить выбор");
         JButton saveXmlButton = new JButton("Сохранить XML");
         JButton saveExcelButton = new JButton("Сохранить Excel");
+        JButton saveCompareButton = new JButton("Сохранить валюты для сравнения");
 
         JPanel buttonPanel = new JPanel();
         buttonPanel.setLayout(new FlowLayout());
@@ -54,6 +55,8 @@ public class CurrencyParserGUI {
         buttonPanel.add(clearButton);
         buttonPanel.add(saveXmlButton);
         buttonPanel.add(saveExcelButton);
+        buttonPanel.add(saveCompareButton);
+
 
         JLabel titleLabel = new JLabel("Выберите одну или несколько валют из списка:");
 
@@ -92,6 +95,7 @@ public class CurrencyParserGUI {
                 resultText.append("Номинал: ").append(nominal).append("\n");
                 resultText.append("Курс: ").append(value).append("\n");
                 resultText.append("Курс за 1 единицу валюты: ").append(rateForOneUnit).append("\n");
+                resultText.append(CurrencyParser.getRateChangeText(valute)).append("\n");
                 resultText.append("------------------------------\n\n");
             }
 
@@ -133,6 +137,12 @@ public class CurrencyParserGUI {
             CurrencyParser.createExcel(selectedCurrencies);
 
             JOptionPane.showMessageDialog(frame, "Выбранные валюты сохранены в Excel.");
+        });
+
+        saveCompareButton.addActionListener(e -> {
+            CurrencyParser.saveRatesForComparison(allCurrencies);
+
+            JOptionPane.showMessageDialog(frame, "Курсы всех валют сохранены для последующего сравнения.");
         });
 
         frame.setVisible(true);

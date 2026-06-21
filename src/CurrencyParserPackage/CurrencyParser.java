@@ -14,6 +14,8 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -125,24 +127,30 @@ public class CurrencyParser {
             header.createCell(4).setCellValue("Номинал");
             header.createCell(5).setCellValue("Курс за номинал");
             header.createCell(6).setCellValue("Курс за 1 единицу валюты");
+            header.createCell(7).setCellValue("Дата сохраненного курса");
+            header.createCell(8).setCellValue("Сохраненный курс");
+            header.createCell(9).setCellValue("Изменение курса");
 
             int rowNumber = 1;
 
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
             String currentDate = LocalDateTime.now().format(formatter);
 
+            String savedDate = getSavedRatesDate();
+
             for (int i = 0; i < selectedCurrencies.size(); i++) {
 
                 Element valute = selectedCurrencies.get(i);
 
-                String numCode = valute.getElementsByTagName("NumCode").item(0).getTextContent();
-                String charCode = valute.getElementsByTagName("CharCode").item(0).getTextContent();
-                String nominal = valute.getElementsByTagName("Nominal").item(0).getTextContent();
-                String name = valute.getElementsByTagName("Name").item(0).getTextContent();
-                String value = valute.getElementsByTagName("Value").item(0).getTextContent();
+                String numCode = getTagValue(valute, "NumCode");
+                String charCode = getTagValue(valute, "CharCode");
+                String nominal = getTagValue(valute, "Nominal");
+                String name = getTagValue(valute, "Name");
+                String value = getTagValue(valute, "Value");
 
                 double valueNumber = Double.parseDouble(value.replace(",", "."));
                 double rateForOneUnit = calculateRateForOneUnit(value, nominal);
+                double savedRate = getSavedRate(charCode);
 
                 Row row = sheet.createRow(rowNumber);
 
@@ -154,11 +162,25 @@ public class CurrencyParser {
                 row.createCell(5).setCellValue(valueNumber);
                 row.createCell(6).setCellValue(rateForOneUnit);
 
+                if (savedDate.equals("")) {
+                    row.createCell(7).setCellValue("Нет данных");
+                } else {
+                    row.createCell(7).setCellValue(savedDate);
+                }
+
+                if (savedRate == -1) {
+                    row.createCell(8).setCellValue("Нет данных");
+                } else {
+                    row.createCell(8).setCellValue(savedRate);
+                }
+
+                row.createCell(9).setCellValue(getRateChangeText(valute));
+
                 rowNumber++;
             }
 
-            for (int i = 0; i <= 6; i++) { //выравнивание колонок по их длине
-               sheet.autoSizeColumn(i);
+            for (int i = 0; i <= 9; i++) {
+                sheet.autoSizeColumn(i);
             }
 
             FileOutputStream outputStream = new FileOutputStream(excelFileName);
@@ -185,16 +207,142 @@ public class CurrencyParser {
         return valueNumber / nominalNumber;
     }
 
-    public static double calculateRubles(double amount, double rateForOneUnit) {  //Метод переводит сумму в выбранной валюте в рубли
-        return amount * rateForOneUnit;
+
+    //аналогичный метод, но принимает на вход элемент
+    public static double getRateForOneUnit(Element valute) {
+        String nominal = getTagValue(valute, "Nominal");
+        String value = getTagValue(valute, "Value");
+
+        return calculateRateForOneUnit(value, nominal);
     }
 
-    public static double calculateCurrencyAmount(double rubles, double rateForOneUnit) { //Метод переводит сумму в рублях в выбранную валюту
-        if (rateForOneUnit <= 0) {
-            return 0;
+
+    // метод сохраняет все валюты для дальнейшего сравнения и вывода информации о росте/падкнии курса. Метод записывает дату сохранения и все валюты в текстовый файл
+    public static void saveRatesForComparison(ArrayList<Element> allCurrencies) {
+
+        try {
+            PrintWriter writer = new PrintWriter(new FileWriter("last_rates.txt"));
+
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+            String currentDate = LocalDateTime.now().format(formatter);
+
+            writer.println("DATE;" + currentDate);
+
+            for (int i = 0; i < allCurrencies.size(); i++) {
+                Element valute = allCurrencies.get(i);
+
+                String charCode = getTagValue(valute, "CharCode");
+                double rateForOneUnit = getRateForOneUnit(valute);
+
+                writer.println(charCode + ";" + rateForOneUnit);
+            }
+
+            writer.close();
+
+            System.out.println("Курсы всех валют сохранены для сравнения.");
+
+        } catch (Exception e) {
+            System.out.println("Произошла ошибка при сохранении курсов для сравнения:");
+            System.out.println(e.getMessage());
+        }
+    }
+
+    //метод для получения даты последнего сохранения валют, для вывода информации с какой именно даты курс подянлся или опустился
+    public static String getSavedRatesDate() {
+
+        try {
+            File file = new File("last_rates.txt");
+
+            if (!file.exists()) {
+                return "";
+            }
+
+            Scanner scanner = new Scanner(file);
+
+            if (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+                String[] parts = line.split(";");
+
+                if (parts.length == 2 && parts[0].equals("DATE")) {
+                    scanner.close();
+                    return parts[1];
+                }
+            }
+
+            scanner.close();
+
+        } catch (Exception e) {
+            System.out.println("Произошла ошибка при чтении даты сохранения:");
+            System.out.println(e.getMessage());
         }
 
-        return rubles / rateForOneUnit;
+        return "";
+    }
+
+    //метод ищет посдений сохраненный курс валюты в last_rates.txt, если файла нет возвращает -1, если файл есть возвращет курс
+    public static double getSavedRate(String charCode) {
+
+        try {
+            File file = new File("last_rates.txt");
+
+            if (!file.exists()) {
+                return -1;
+            }
+
+            Scanner scanner = new Scanner(file);
+
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+
+                String[] parts = line.split(";");
+
+                if (parts.length == 2) {
+                    String savedCharCode = parts[0];
+
+                    if (savedCharCode.equalsIgnoreCase(charCode)) {
+                        double savedRate = Double.parseDouble(parts[1]);
+
+                        scanner.close();
+                        return savedRate;
+                    }
+                }
+            }
+
+            scanner.close();
+
+        } catch (Exception e) {
+            System.out.println("Произошла ошибка при чтении сохраненного курса:");
+            System.out.println(e.getMessage());
+        }
+
+        return -1;
+    }
+
+    //метод для обработки информации о росте/падении курса, возвращает готовую строку для вставки в интерфейс. метод сравнивает текущий курс из xml и последний сохраненный курс валюты из txt файла.
+    public static String getRateChangeText(Element valute) {
+
+        String charCode = getTagValue(valute, "CharCode");
+
+        double currentRate = getRateForOneUnit(valute);
+        double savedRate = getSavedRate(charCode);
+
+        String savedDate = getSavedRatesDate();
+
+        if (savedRate == -1 || savedDate.equals("")) {
+            return "Изменение курса: данные для сравнения не сохранены.";
+        }
+
+        if (currentRate > savedRate) {
+            double difference = currentRate - savedRate;
+
+            return "Изменение курса с " + savedDate + ": курс вырос на " + String.format("%.4f", difference) + " руб.";
+        } else if (currentRate < savedRate) {
+            double difference = savedRate - currentRate;
+
+            return "Изменение курса с " + savedDate + ": курс снизился на " + String.format("%.4f", difference) + " руб.";
+        } else {
+            return "Изменение курса с " + savedDate + ": курс не изменился.";
+        }
     }
 
 }
